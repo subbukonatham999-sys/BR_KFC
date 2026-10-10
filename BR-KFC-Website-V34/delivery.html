@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BR KFC Delivery Partner</title><style>body{margin:0;background:#f7f7f7;color:#171414;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}.wrap{max-width:1000px;margin:auto;padding:24px}.card{background:#fff;border:1px solid #e7e1dd;border-radius:22px;padding:22px;box-shadow:0 12px 40px #0000000b;margin-bottom:16px}.login{min-height:80vh;display:grid;place-items:center}.login .card{width:min(430px,100%)}h1,h2{margin-top:0}.field{display:flex;flex-direction:column;gap:7px;margin:12px 0}.field label{font-size:12px;font-weight:900;color:#666}.field input{padding:13px;border:1px solid #ddd;border-radius:12px;font:inherit}.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer}.red{background:#e51b23;color:#fff}.dark{background:#171414;color:#fff}.light{background:#eee}.hidden{display:none!important}.error{color:#b00020;background:#fff0f0;padding:10px;border-radius:10px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.order{border:1px solid #eee;border-radius:18px;padding:18px;margin:12px 0}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.pill{padding:6px 10px;border-radius:999px;background:#eee;font-weight:900}.muted{color:#777}.map{display:inline-flex;margin-top:10px;text-decoration:none}.status{margin-top:14px;width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-weight:900}</style></head><body><div id="loginView" class="wrap login"><div class="card"><h1>🛵 BR KFC</h1><p class="muted">Delivery Partner Login</p><div id="loginError" class="error hidden"></div><div class="field"><label>EMAIL</label><input id="email" type="email" autocomplete="username"></div><div class="field"><label>PASSWORD</label><input id="password" type="password" autocomplete="current-password"></div><button id="loginBtn" class="btn red" style="width:100%">Sign In</button><p class="muted" style="font-size:12px;margin-top:14px">Only accounts with the delivery_partner role can access this panel.</p></div></div><main id="app" class="wrap hidden"><div class="top card"><div><div style="font-weight:950;color:#b8000d">BR KFC DELIVERY</div><h1 id="welcome">Assigned Orders</h1><p class="muted" style="margin:0">Use the map link to navigate to the customer.</p></div><div class="row"><button id="refresh" class="btn light">↻ Refresh</button><button id="logout" class="btn dark">Logout</button></div></div><div id="orders"></div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="this.onerror=null;this.src='https://unpkg.com/@supabase/supabase-js@2';"></script>
+<script>
+const URL='https://krohgoexkjbtjqbyogpl.supabase.co';
+const KEY='sb_publishable_8zSlVg0WnOg28REY_LaeJQ_iqECtKQZ';
+let db=null;
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
+function err(m){const e=$('loginError');e.textContent=m;e.classList.remove('hidden');}
+function clearErr(){$('loginError').textContent='';$('loginError').classList.add('hidden');}
+function setBusy(v){$('loginBtn').disabled=v;$('loginBtn').textContent=v?'Signing in…':'Sign In';}
+function initClient(){
+  if(!window.supabase || typeof window.supabase.createClient!=='function'){
+    err('Login service is still loading. Please wait 2 seconds and try again.');
+    return false;
+  }
+  if(!db) db=window.supabase.createClient(URL,KEY);
+  return true;
+}
+async function login(){
+  clearErr();
+  setBusy(true);
+  try{
+    if(!initClient()) return;
+    const email=$('email').value.trim();
+    const password=$('password').value;
+    if(!email){err('Please enter your email.');return}
+    if(!password){err('Please enter your password.');return}
+    const r=await db.auth.signInWithPassword({email,password});
+    if(r.error){err('Sign-in failed: '+r.error.message);return}
+    const u=r.data?.user;
+    if(!u){err('Sign-in failed: Supabase returned no user.');return}
+
+    // Accept either the Auth role OR an active delivery_partners record.
+    // This avoids stale app_metadata/session-token issues after creating a new rider.
+    let allowed=u.app_metadata?.role==='delivery_partner';
+    if(!allowed){
+      const pr=await db.from('delivery_partners').select('id,name,phone,is_active').eq('user_id',u.id).maybeSingle();
+      if(pr.error){await db.auth.signOut();err('Login succeeded, but delivery access could not be verified: '+pr.error.message);return}
+      allowed=!!pr.data && pr.data.is_active!==false;
+    }
+    if(!allowed){await db.auth.signOut();err('This account is not registered as an active BR KFC delivery partner.');return}
+
+    $('loginView').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    await load();
+  }catch(e){
+    console.error(e);
+    err('Sign-in error: '+(e?.message||String(e)));
+  }finally{setBusy(false)}
+}
+async function load(){
+  try{
+    if(!initClient()) return;
+    const {data:userData,error:userErr}=await db.auth.getUser();
+    if(userErr||!userData?.user){
+      $('app').classList.add('hidden');$('loginView').classList.remove('hidden');
+      err(userErr?.message||'Your session has expired. Please sign in again.');return;
+    }
+    const user=userData.user;
+    const pr=await db.from('delivery_partners').select('name,phone').eq('user_id',user.id).maybeSingle();
+    $('welcome').textContent=pr.data?.name?`Hi ${pr.data.name} 👋`:'Assigned Orders';
+    const r=await db.from('orders').select('*').eq('delivery_partner_id',user.id).order('created_at',{ascending:false});
+    if(r.error){$('orders').innerHTML='<div class="card error">'+esc(r.error.message)+'</div>';return}
+    if(!r.data?.length){$('orders').innerHTML='<div class="card"><h2>No assigned orders</h2><p class="muted">New assigned deliveries will appear here.</p></div>';return}
+    $('orders').innerHTML=r.data.map(o=>`<div class="order"><div class="top"><div><b>#${esc(o.order_number)}</b><div class="muted">${new Date(o.created_at).toLocaleString()}</div></div><span class="pill">₹${Number(o.total).toFixed(2)} · ${o.payment_method==='online'?'Paid':'COD'}</span></div><h3 style="margin-bottom:6px">${esc(o.customer_name)} · ${esc(o.customer_phone)}</h3><div>${esc(o.address||'Pickup')}${o.landmark?'<br>📍 '+esc(o.landmark):''}${o.delivery_note?'<br>📝 '+esc(o.delivery_note):''}</div>${o.customer_latitude&&o.customer_longitude?`<a class="btn dark map" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${o.customer_latitude},${o.customer_longitude}">🗺️ Navigate to Customer</a>`:''}<select class="status" data-id="${o.id}"><option value="accepted" ${o.status==='accepted'?'selected':''}>Accepted</option><option value="preparing" ${o.status==='preparing'?'selected':''}>Preparing</option><option value="prepared" ${o.status==='prepared'?'selected':''}>Prepared</option><option value="out_for_delivery" ${o.status==='out_for_delivery'?'selected':''}>Out for Delivery</option><option value="delivered" ${o.status==='delivered'?'selected':''}>Delivered</option></select></div>`).join('');
+    document.querySelectorAll('.status').forEach(s=>s.onchange=async()=>{const rr=await db.from('orders').update({status:s.value}).eq('id',s.dataset.id);if(rr.error)alert(rr.error.message);else load()});
+  }catch(e){$('orders').innerHTML='<div class="card error">'+esc(e?.message||String(e))+'</div>'}
+}
+function bind(){
+  $('loginBtn').onclick=login;
+  $('password').onkeydown=e=>{if(e.key==='Enter')login()};
+  $('email').onkeydown=e=>{if(e.key==='Enter')login()};
+  $('refresh').onclick=load;
+  $('logout').onclick=async()=>{if(initClient())await db.auth.signOut();location.reload()};
+  initClient();
+  if(db) db.auth.getSession().then(r=>{if(r.data?.session){load()}}).catch(e=>console.warn('Session check:',e));
+}
+window.addEventListener('error',e=>{if($('loginView')&&!$('loginView').classList.contains('hidden'))err('Page error: '+(e.message||'Unknown browser error'))});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+</script></body></html>

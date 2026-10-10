@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BR KFC Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f7f3ef;color:#171414}
+.top{background:#171414;color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:15px;position:sticky;top:0;z-index:5}.brand{font-weight:1000;font-size:22px}.brand small{display:block;font-size:10px;letter-spacing:3px;opacity:.6}
+.wrap{max-width:1180px;margin:auto;padding:22px}.login{min-height:75vh;display:grid;place-items:center}.loginCard,.card{background:#fff;border:1px solid #e7dfd8;border-radius:22px;box-shadow:0 12px 40px #0000000d}.loginCard{width:min(430px,100%);padding:28px}.loginCard h1{margin:0 0 8px;font-size:32px}.loginCard p{color:#777}.field{display:flex;flex-direction:column;gap:7px;margin:13px 0}.field label{font-size:11px;font-weight:950;color:#555}.field input{padding:13px;border:1px solid #ddd;border-radius:12px;font:inherit}.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:900;cursor:pointer}.red{background:#e51b23;color:#fff}.dark{background:#171414;color:#fff}.light{background:#eee}.hidden{display:none!important}.error{color:#b00020;background:#fff0f0;border:1px solid #ffc9c9;padding:10px;border-radius:10px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.stat{padding:18px}.stat b{display:block;font-size:30px}.stat span{color:#777;font-size:13px}
+.section{margin-top:22px}.section h2{margin:0 0 12px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}.tableWrap{overflow:auto}.table{width:100%;border-collapse:collapse;min-width:900px}.table th,.table td{text-align:left;padding:12px;border-bottom:1px solid #eee;vertical-align:top;font-size:13px}.table th{font-size:11px;color:#666}.pill{display:inline-block;border-radius:999px;padding:6px 9px;background:#eee;font-weight:900}.status{padding:7px;border:1px solid #ddd;border-radius:9px;font-weight:800}.stock{padding:7px 10px;border:0;border-radius:999px;font-weight:900;cursor:pointer}.on{background:#e8f8ed;color:#17713b}.off{background:#ffe9e9;color:#b00020}.notice{padding:12px;background:#fff8e8;border:1px solid #f0d28d;border-radius:12px;color:#6d5421;font-size:13px;margin-bottom:15px}
+@media(max-width:850px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr}.wrap{padding:14px}}
+
+.menuCards{display:none}
+@media(max-width:700px){
+  #menuTableWrap{display:none}
+  .menuCards{display:grid;gap:10px}
+  .menuCard{border:1px solid #eee;border-radius:16px;padding:15px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .menuCardName{font-weight:900;font-size:16px}
+  .menuCardMeta{font-size:12px;color:#777;margin-top:4px}
+  .stockBtn{min-width:130px;padding:11px 10px;border:0;border-radius:12px;font-weight:900;cursor:pointer}
+}
+
+.mediaGrid{display:grid;gap:18px}.mediaCard{border:1px solid #eadfd8;border-radius:20px;padding:16px;background:#fff}.mediaCard h3{margin:0 0 10px}.mediaRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mediaRow input,.mediaRow select{width:100%;padding:12px;border:1px solid #ddd;border-radius:12px;font-size:15px}.mediaPreview{width:100%;height:170px;border-radius:15px;object-fit:cover;background:#f5f5f5;margin:10px 0}.mediaActions{display:flex;gap:8px;flex-wrap:wrap}.smallBtn{border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}.smallBtn.red{background:#ed1c24;color:#fff}.smallBtn.dark{background:#171313;color:#fff}.smallBtn.light{background:#f3eee9}.bannerGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.bannerCard{border:1px solid #eadfd8;border-radius:18px;padding:14px}.bannerCard img{width:100%;height:150px;object-fit:cover;border-radius:12px;background:#f3f3f3}@media(max-width:650px){.mediaRow,.bannerGrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top"><div class="brand">🍗 BR KFC <small>BALA RAMA KFC · ADMIN</small></div><div><a href="/" class="btn light" style="text-decoration:none;display:inline-block">Customer Site</a> <button id="logout" class="btn light hidden">Logout</button></div></header>
+
+<main class="wrap">
+<section id="loginView" class="login">
+ <div class="loginCard">
+  <h1>Admin Login</h1>
+  <p>Private BR KFC order and stock management.</p>
+  <div id="loginError" class="error hidden"></div>
+  <div class="field"><label>EMAIL</label><input id="email" type="email" autocomplete="username" placeholder="Admin email"></div>
+  <div class="field"><label>PASSWORD</label><input id="password" type="password" autocomplete="current-password" placeholder="Password"></div>
+  <button id="loginBtn" class="btn red" style="width:100%">Sign In</button>
+  <button id="forgotPasswordBtn" class="btn light" style="width:100%;margin-top:9px" type="button">Forgot password?</button>
+  <p style="font-size:12px">This dashboard requires a Supabase Auth user with <b>app_metadata.role = admin</b>.</p>
+ </div>
+</section>
+
+<section id="recoveryView" class="login hidden">
+ <div class="loginCard">
+  <h1>Set a new password</h1>
+  <p>Choose a new password for your BR KFC admin account.</p>
+  <div id="recoveryError" class="error hidden"></div>
+  <div class="field"><label>NEW PASSWORD</label><input id="newPassword" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters"></div>
+  <div class="field"><label>CONFIRM NEW PASSWORD</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="6" placeholder="Enter it again"></div>
+  <button id="saveNewPassword" class="btn red" style="width:100%" type="button">Update Password</button>
+ </div>
+</section>
+
+<section id="dash" class="hidden">
+ <div class="notice">🔐 You are in the BR KFC admin area. Customer addresses and phone numbers are only shown after admin authentication.</div>
+ <div class="grid">
+  <div class="card stat"><b id="newCount">0</b><span>New Orders</span></div>
+  <div class="card stat"><b id="todayCount">0</b><span>Today's Orders</span></div>
+  <div class="card stat"><b id="salesTotal">₹0</b><span>Today's Sales</span></div>
+  <div class="card stat"><b id="outCount">0</b><span>Out of Stock</span></div>
+ </div>
+
+ <section class="section card" style="padding:18px">
+  <h2>Orders</h2><p style="font-size:12px;color:#777;margin-top:-4px">Update order status here. Customers can track these changes from Order History.</p>
+  <div class="toolbar"><button class="btn dark" id="refreshOrders">Refresh Orders</button></div>
+  <div class="tableWrap"><table class="table"><thead><tr><th>Order</th><th>Customer</th><th>Address</th><th>Items</th><th>Total</th><th>Payment</th><th>Location</th><th>Delivery Partner</th><th>Status</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
+ </section>
+
+ <section class="section card" style="padding:18px">
+  <h2>Customer Feedback</h2><p style="font-size:12px;color:#777;margin-top:-4px">Ratings and comments submitted from the customer website.</p>
+  <div class="toolbar"><button class="btn dark" id="refreshFeedback">Refresh Feedback</button></div>
+  <div class="tableWrap"><table class="table"><thead><tr><th>Received</th><th>Rating</th><th>Feedback</th></tr></thead><tbody id="feedbackBody"></tbody></table></div>
+ </section>
+
+ <section class="section card" style="padding:18px">
+  <h2>🖼️ Website & Menu Management</h2>
+  <p style="color:#777">Change food photos, names, categories and prices. Uploading a photo saves it to secure BR KFC Supabase Storage and immediately updates the customer website.</p>
+  <div class="toolbar"><button class="btn dark" id="refreshMedia">Refresh Media</button></div>
+  <h3 style="margin-top:12px">Food Items</h3>
+  <div class="mediaGrid" id="mediaGrid"></div>
+  <h3 style="margin-top:24px">Home Page Slider</h3>
+  <div class="bannerGrid" id="bannerGrid"></div>
+ </section>
+
+ <section class="section card" style="padding:18px">
+  <h2>Menu & Stock</h2>
+  <p style="color:#777">Tap a button to make an item available or out of stock. Customer ordering will respect this status.</p>
+  <div class="tableWrap" id="menuTableWrap"><table class="table"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Availability</th></tr></thead><tbody id="menuBody"></tbody></table></div>
+  <div class="menuCards" id="menuCards"></div>
+ </section>
+</section>
+</main>
+
+<script>
+const SUPABASE_URL='https://krohgoexkjbtjqbyogpl.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtyb2hnb2V4a2pidGpxYnlvZ3BsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1NTIwODksImV4cCI6MjEwMjEyODA4OX0.BPivuzum75gbDc1omhtl3MLw728WMbit5mtppQI8hH0';
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+let currentUser=null;
+
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function money(v){return '₹'+Number(v||0).toLocaleString('en-IN')}
+function showError(msg){$('loginError').textContent=msg;$('loginError').classList.remove('hidden')}
+
+$('forgotPasswordBtn').onclick=async()=>{
+ $('loginError').classList.add('hidden');
+ const email=$('email').value.trim();
+ if(!email){showError('Enter your admin email first.');$('email').focus();return}
+ const button=$('forgotPasswordBtn');button.disabled=true;button.textContent='Sending reset link...';
+ let resetTimeout;
+ try{
+   const {error}=await Promise.race([
+     db.auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/admin.html`}),
+     new Promise((_,reject)=>{resetTimeout=setTimeout(()=>reject(new Error('Password reset request timed out.')),8000)})
+   ]);
+   if(error)showError(error.message);
+   else showError('If an account exists for this email, Supabase has sent a password reset link. Check your inbox and spam folder.');
+ }catch(error){
+   console.error('Password reset request failed',error);
+   showError(error.message==='Password reset request timed out.'?'Supabase did not respond. Check your connection and try again.':'Could not reach Supabase. Check your connection and try again.');
+ }finally{
+   clearTimeout(resetTimeout);
+   button.disabled=false;button.textContent='Forgot password?';
+ }
+};
+
+let recoveryInProgress=false;
+db.auth.onAuthStateChange(event=>{
+ if(event==='PASSWORD_RECOVERY'){
+   recoveryInProgress=true;
+   $('loginView').classList.add('hidden');
+   $('dash').classList.add('hidden');
+   $('recoveryView').classList.remove('hidden');
+   $('newPassword').focus();
+ }
+});
+
+$('saveNewPassword').onclick=async()=>{
+ const password=$('newPassword').value;
+ const confirmation=$('confirmPassword').value;
+ const box=$('recoveryError');
+ box.classList.add('hidden');
+ if(password.length<6){box.textContent='Use a password with at least 6 characters.';box.classList.remove('hidden');return}
+ if(password!==confirmation){box.textContent='The passwords do not match.';box.classList.remove('hidden');return}
+ const button=$('saveNewPassword');button.disabled=true;button.textContent='Updating...';
+ const {data,error}=await db.auth.updateUser({password});
+ if(error){box.textContent=error.message;box.classList.remove('hidden');button.disabled=false;button.textContent='Update Password';return}
+ await db.auth.signOut();
+ $('recoveryView').classList.add('hidden');
+ $('loginView').classList.remove('hidden');
+ $('email').value=data.user?.email||$('email').value;
+ $('password').value='';
+ showError('Password updated. Sign in with your new password.');
+ button.disabled=false;button.textContent='Update Password';
+};
+
+$('loginBtn').onclick=async()=>{
+ $('loginError').classList.add('hidden');$('loginBtn').disabled=true;$('loginBtn').textContent='Signing in...';
+ const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ if(error){showError(error.message);$('loginBtn').disabled=false;$('loginBtn').textContent='Sign In';return}
+ currentUser=data.user;
+ if(currentUser?.app_metadata?.role!=='admin'){
+   await db.auth.signOut();showError('This account is not a BR KFC admin account. Set app_metadata.role to admin in Supabase Auth, then sign in again.');
+   $('loginBtn').disabled=false;$('loginBtn').textContent='Sign In';return;
+ }
+ $('loginView').classList.add('hidden');$('dash').classList.remove('hidden');$('logout').classList.remove('hidden');
+ await refreshAll();
+};
+
+$('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+
+window.brKfcDeliveryPartners=[];
+async function loadDeliveryPartners(){
+ const r=await db.from('delivery_partners').select('user_id,name,phone,is_active').eq('is_active',true).order('name');
+ window.brKfcDeliveryPartners=r.data||[];
+}
+async function refreshAll(){await loadDeliveryPartners();await Promise.all([loadOrders(),loadFeedback(),loadMenu(),loadMedia()])}
+
+async function loadFeedback(){
+ const {data:feedback,error}=await db.from('customer_feedback').select('id,rating,description,created_at').order('created_at',{ascending:false}).limit(500);
+ if(error){$('feedbackBody').innerHTML=`<tr><td colspan="3" class="error">${esc(error.message)}</td></tr>`;return}
+ $('feedbackBody').innerHTML=feedback?.length?feedback.map(item=>`<tr>
+  <td>${new Date(item.created_at).toLocaleString()}</td>
+  <td><span aria-label="${Number(item.rating)} out of 5 stars">${'★'.repeat(Number(item.rating))}${'☆'.repeat(5-Number(item.rating))}</span></td>
+  <td style="white-space:pre-wrap;min-width:280px">${esc(item.description)}</td>
+ </tr>`).join(''):'<tr><td colspan="3" style="padding:28px;text-align:center;color:#777">No feedback received yet.</td></tr>';
+}
+
+async function loadOrders(){
+ const {data:orders,error}=await db.from('orders').select('*').order('created_at',{ascending:false}).limit(100);
+ if(error){$('ordersBody').innerHTML=`<tr><td colspan="7" class="error">${esc(error.message)}</td></tr>`;return}
+ const ids=orders.map(o=>o.id);
+ let items=[];
+ if(ids.length){const r=await db.from('order_items').select('*').in('order_id',ids);if(!r.error)items=r.data||[]}
+ const map={};items.forEach(i=>(map[i.order_id]??=[]).push(i));
+ const today=new Date().toISOString().slice(0,10);
+ let newN=0,todayN=0,sales=0;
+ orders.forEach(o=>{if(o.status==='new')newN++;if(o.created_at.slice(0,10)===today){todayN++;sales+=Number(o.total)}})
+ $('newCount').textContent=newN;$('todayCount').textContent=todayN;$('salesTotal').textContent=money(sales);
+ $('ordersBody').innerHTML=orders.length?orders.map(o=>`<tr>
+ <td><b>#${esc(o.order_number)}</b><br><small>${new Date(o.created_at).toLocaleString()}</small></td>
+ <td><b>${esc(o.customer_name)}</b><br>📞 ${esc(o.customer_phone)}</td>
+ <td>${esc(o.address||'Pickup')}${o.landmark?'<br>📍 '+esc(o.landmark):''}${o.delivery_note?'<br>📝 '+esc(o.delivery_note):''}</td>
+ <td>${(map[o.id]||[]).map(i=>esc(i.item_name)+' × '+i.quantity).join('<br>')}</td>
+ <td><b>${money(o.total)}</b></td>
+ <td>${o.payment_method==='online'?'💳 Online':'💵 COD'}<br><small>${esc(o.payment_status)}</small></td>
+ <td>${o.customer_latitude&&o.customer_longitude?`<a class="btn light" style="padding:7px 10px" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${o.customer_latitude},${o.customer_longitude}">📍 Open Map</a><br><small>±${Math.round(o.customer_location_accuracy||0)}m</small>`:'<span style="color:#999">No GPS</span>'}</td>
+ <td><select class="deliveryAssign" data-order-id="${o.id}"><option value="">Unassigned</option>${window.brKfcDeliveryPartners.map(dp=>`<option value="${dp.user_id}" ${o.delivery_partner_id===dp.user_id?'selected':''}>${esc(dp.name)}${dp.phone?' · '+esc(dp.phone):''}</option>`).join('')}</select></td>
+ <td><select class="status" data-order-id="${o.id}">${[['new','Order Received'],['accepted','Accepted'],['preparing','Preparing'],['prepared','Prepared'],['out_for_delivery','Out for Delivery'],['ready_for_pickup','Ready for Pickup'],['delivered','Delivered'],['cancelled','Cancelled']].map(s=>`<option value="${s[0]}" ${o.status===s[0]?'selected':''}>${s[1]}</option>`).join('')}</select></td>
+ </tr>`).join(''):'<tr><td colspan="7" style="padding:35px;text-align:center;color:#777">No orders found.</td></tr>';
+ document.querySelectorAll('[data-order-id]').forEach(s=>s.onchange=async()=>{const {error}=await db.from('orders').update({status:s.value}).eq('id',s.dataset.orderId);if(error)alert(error.message);else loadOrders()});
+ document.querySelectorAll('.deliveryAssign').forEach(s=>s.onchange=async()=>{const partner=s.value||null;const payload={delivery_partner_id:partner,delivery_assigned_at:partner?new Date().toISOString():null};const {error}=await db.from('orders').update(payload).eq('id',s.dataset.orderId);if(error)alert(error.message);else loadOrders()});
+}
+
+async function loadMenu(){
+ const {data,error}=await db.from('menu_items').select('*').order('category').order('sort_order');
+ if(error){
+   $('menuBody').innerHTML=`<tr><td colspan="4" class="error">${esc(error.message)}</td></tr>`;
+   $('menuCards').innerHTML=`<div class="error">${esc(error.message)}</div>`;
+   return;
+ }
+ const rows=data||[];
+ $('outCount').textContent=rows.filter(x=>!x.is_available).length;
+
+ $('menuBody').innerHTML=rows.map(x=>`<tr>
+ <td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${money(x.price)}</td>
+ <td><button class="stock ${x.is_available?'on':'off'}" data-menu-id="${x.id}" data-current="${x.is_available}">
+ ${x.is_available?'🟢 Available':'🔴 Out of Stock'}</button></td></tr>`).join('');
+
+ $('menuCards').innerHTML=rows.map(x=>`<div class="menuCard">
+   <div><div class="menuCardName">${esc(x.name)}</div><div class="menuCardMeta">${esc(x.category)} · ${money(x.price)}</div></div>
+   <button class="stockBtn ${x.is_available?'on':'off'}" data-menu-card-id="${x.id}" data-current="${x.is_available}">
+   ${x.is_available?'🟢 Available':'🔴 Out of Stock'}</button>
+ </div>`).join('');
+
+ async function toggleStock(id,current,btn){
+   btn.disabled=true;
+   const next=current!=='true';
+   const {error}=await db.from('menu_items').update({is_available:next}).eq('id',id);
+   if(error){
+     alert('Could not update stock: '+error.message);
+     btn.disabled=false;
+   } else {
+     await loadMenu();
+   }
+ }
+ document.querySelectorAll('[data-menu-id]').forEach(b=>b.onclick=()=>toggleStock(b.dataset.menuId,b.dataset.current,b));
+ document.querySelectorAll('[data-menu-card-id]').forEach(b=>b.onclick=()=>toggleStock(b.dataset.menuCardId,b.dataset.current,b));
+}
+
+async function loadMedia(){
+ const {data:rows,error}=await db.from('menu_items').select('*').order('category').order('sort_order');
+ if(error){$('mediaGrid').innerHTML='<div class="error">'+esc(error.message)+'</div>';return}
+ $('mediaGrid').innerHTML=(rows||[]).map(x=>`<div class="mediaCard">
+   <h3>${esc(x.name)}</h3>
+   <img class="mediaPreview" src="${esc(/^https?:\/\//i.test(x.image_key||'')?x.image_key:'')}" onerror="this.style.display='none'" alt="">
+   <div class="mediaRow"><input data-edit-name="${x.id}" value="${esc(x.name)}" placeholder="Item name"><input type="number" data-edit-price="${x.id}" value="${Number(x.price)}" min="0" step="1" placeholder="Price"></div>
+   <div style="font-size:13px;color:#666;margin-top:8px"><b>Category:</b> ${esc(x.category)} &nbsp; <b>Item ID:</b> ${esc(x.id)}</div><div class="mediaRow" style="margin-top:8px"><input data-edit-category="${x.id}" value="${esc(x.category)}" placeholder="Category"><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-upload="${x.id}"></div>
+   <div class="mediaActions" style="margin-top:10px"><button class="smallBtn dark" data-upload-save="${x.id}">🖼️ Save Image</button><button class="smallBtn dark" data-save="${x.id}">Save Details</button><button class="smallBtn light" data-stock="${x.id}" data-current="${x.is_available}">${x.is_available?'🟢 Available':'🔴 Out of Stock'}</button></div>
+   <small data-upload-status="${x.id}" style="display:block;margin-top:8px;color:#777">Choose an image for <b>${esc(x.name)}</b> in <b>${esc(x.category)}</b>, then tap <b>Save Image</b>.</small>
+   <small style="display:block;margin-top:8px;color:#777">Current image: ${esc(x.image_key||'No item-specific image saved — customer site will show a neutral placeholder')}</small>
+ </div>`).join('');
+ document.querySelectorAll('[data-save]').forEach(btn=>btn.onclick=async()=>{
+   const id=btn.dataset.save; const payload={name:document.querySelector(`[data-edit-name="${id}"]`).value.trim(),price:Number(document.querySelector(`[data-edit-price="${id}"]`).value),category:document.querySelector(`[data-edit-category="${id}"]`).value.trim()};
+   if(!payload.name||!payload.category||!Number.isFinite(payload.price)){alert('Enter valid name, category and price.');return}
+   btn.disabled=true;const {error}=await db.from('menu_items').update(payload).eq('id',id);btn.disabled=false;if(error)alert(error.message);else await loadMedia();
+ });
+ document.querySelectorAll('[data-upload-save]').forEach(btn=>btn.onclick=async()=>{
+   const id=btn.dataset.uploadSave;
+   const inp=document.querySelector(`[data-upload="${id}"]`);
+   const status=document.querySelector(`[data-upload-status="${id}"]`);
+   const file=inp?.files?.[0];
+   if(!file){alert('Choose an image for this item first.');return}
+   if(file.size>5*1024*1024){alert('Please choose an image under 5 MB.');return}
+   btn.disabled=true; inp.disabled=true; status.textContent='Uploading image…';
+   const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+   const path=`menu/${id}-${Date.now()}.${ext}`;
+   const {error:upErr}=await db.storage.from('br-kfc-media').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'31536000'});
+   if(upErr){alert('Upload failed: '+upErr.message);status.textContent='Upload failed.';btn.disabled=false;inp.disabled=false;return}
+   const {data:pub}=db.storage.from('br-kfc-media').getPublicUrl(path);
+   const imageUrl=`${pub.publicUrl}?v=${Date.now()}`;
+   const {error:dbErr}=await db.from('menu_items').update({image_key:imageUrl}).eq('id',id);
+   if(dbErr){alert('Image uploaded but could not save it: '+dbErr.message);status.textContent='Upload succeeded, database update failed.';btn.disabled=false;inp.disabled=false;return}
+   status.textContent='✅ Image saved for this item.';
+   btn.disabled=false; inp.disabled=false; inp.value='';
+   await loadMedia();
+ });
+ document.querySelectorAll('[data-stock]').forEach(btn=>btn.onclick=async()=>{const next=btn.dataset.current!=='true';const {error}=await db.from('menu_items').update({is_available:next}).eq('id',btn.dataset.stock);if(error)alert(error.message);else await loadMedia()});
+ const {data:banners,error:be}=await db.from('site_banners').select('*').order('sort_order');
+ if(be){$('bannerGrid').innerHTML='<div class="error">'+esc(be.message)+'</div>';return}
+ $('bannerGrid').innerHTML=(banners||[]).map(b=>`<div class="bannerCard"><b>Slide ${b.slot}</b><img src="${esc(b.image_url||'')}" onerror="this.style.display='none'" alt=""><input style="width:100%;margin-top:8px;padding:10px;border:1px solid #ddd;border-radius:10px" data-btitle="${b.id}" value="${esc(b.title)}" placeholder="Title"><input style="width:100%;margin-top:8px;padding:10px;border:1px solid #ddd;border-radius:10px" data-bsub="${b.id}" value="${esc(b.subtitle)}" placeholder="Subtitle"><input style="width:100%;margin-top:8px" type="file" accept="image/png,image/jpeg,image/webp,image/gif" data-bupload="${b.id}"><button class="smallBtn dark" style="margin-top:8px" data-bsave="${b.id}">Save Slide</button></div>`).join('');
+ document.querySelectorAll('[data-bsave]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.bsave;const payload={title:document.querySelector(`[data-btitle="${id}"]`).value.trim(),subtitle:document.querySelector(`[data-bsub="${id}"]`).value.trim()};const {error}=await db.from('site_banners').update(payload).eq('id',id);if(error)alert(error.message);else await loadMedia()});
+ document.querySelectorAll('[data-bupload]').forEach(inp=>inp.onchange=async()=>{const file=inp.files?.[0];if(!file)return;if(file.size>5*1024*1024){alert('Please choose an image under 5 MB.');return}const id=inp.dataset.bupload;inp.disabled=true;const ext=(file.name.split('.').pop()||'jpg').toLowerCase();const path=`banners/${id}-${Date.now()}.${ext}`;const {error:upErr}=await db.storage.from('br-kfc-media').upload(path,file,{upsert:false,contentType:file.type,cacheControl:'31536000'});if(upErr){alert(upErr.message);inp.disabled=false;return}const {data:pub}=db.storage.from('br-kfc-media').getPublicUrl(path);const {error:dbErr}=await db.from('site_banners').update({image_url:pub.publicUrl}).eq('id',id);inp.disabled=false;if(dbErr)alert(dbErr.message);else await loadMedia()});
+}
+
+$('refreshOrders').onclick=refreshAll; $('refreshFeedback').onclick=loadFeedback; $('refreshMedia').onclick=loadMedia;
+
+(async()=>{
+ const {data}=await db.auth.getSession();
+ if(data.session){
+   currentUser=data.session.user;
+   if(currentUser.app_metadata?.role==='admin'&&!recoveryInProgress){$('loginView').classList.add('hidden');$('dash').classList.remove('hidden');$('logout').classList.remove('hidden');refreshAll();}
+ }
+})();
+</script>
+</body>
+</html>
